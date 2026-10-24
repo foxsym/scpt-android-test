@@ -12,44 +12,67 @@ jobs:
     timeout-minutes: 60
 
     steps:
-      - name: Check out this private project
+      - name: Checkout project
         uses: actions/checkout@v4
 
-      - name: Check out J2ME Loader upstream
+      - name: Checkout J2ME Loader
         uses: actions/checkout@v4
         with:
           repository: nikita36078/J2ME-Loader
           path: J2ME-Loader
           submodules: recursive
 
-      - name: Configure JDK 21
+      - name: Setup Java
         uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: '21'
 
-      - name: Use preinstalled Android SDK
+      - name: Check Android SDK
         run: |
           echo "ANDROID_HOME=$ANDROID_SDK_ROOT" >> "$GITHUB_ENV"
-          echo "Android SDK: $ANDROID_SDK_ROOT"
           ls "$ANDROID_SDK_ROOT/platforms"
 
-      - name: Prepare Splinter Cell game
+      - name: Prepare Splinter Cell
         run: |
           python3 prepare_port.py J2ME-Loader SC-PT_E1000_EN_102.jar
           sed -i "s/apkName.toLowerCase()/apkName.toLowerCase().replace('-', '_')/" J2ME-Loader/app/build.gradle
 
-      - name: Build standalone debug APK
+      - name: Include original game classes
+        run: |
+          python3 - <<'PY'
+          import zipfile
+          from pathlib import Path
+
+          source = Path("SC-PT_E1000_EN_102.jar")
+          output = Path("J2ME-Loader/app/scpt-classes.jar")
+
+          with zipfile.ZipFile(source) as original:
+              with zipfile.ZipFile(output, "w", zipfile.ZIP_DEFLATED) as target:
+                  count = 0
+                  for name in original.namelist():
+                      if name.endswith(".class"):
+                          target.writestr(name, original.read(name))
+                          count += 1
+
+          if count == 0:
+              raise RuntimeError("No game classes found")
+
+          print("Included game classes:", count)
+          PY
+          printf '\ndependencies {\n    midletImplementation files("scpt-classes.jar")\n}\n' >> J2ME-Loader/app/build.gradle
+
+      - name: Build standalone APK
         working-directory: J2ME-Loader
         run: |
           chmod +x ./gradlew
           ./gradlew :app:assembleMidletDebug --stacktrace
 
-      - name: Upload APK and build reports
+      - name: Upload APK
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: scpt-test-apk
+          name: scpt-test-apk-v02
           path: |
             J2ME-Loader/app/build/outputs/apk/midlet/debug/*.apk
             J2ME-Loader/app/build/reports/**
