@@ -24,8 +24,11 @@ jobs:
         with:
           distribution: temurin
           java-version: '21'
-      - name: Configure Android SDK
-        uses: android-actions/setup-android@v3
+      - name: Use preinstalled Android SDK
+        run: |
+          echo "ANDROID_HOME=$ANDROID_SDK_ROOT" >> "$GITHUB_ENV"
+          echo "Android SDK: $ANDROID_SDK_ROOT"
+          ls "$ANDROID_SDK_ROOT/platforms"
       - name: Stage SCPT and set portrait launcher
         run: python3 prepare_port.py J2ME-Loader SC-PT_E1000_EN_102.jar
       - name: Build standalone debug APK
