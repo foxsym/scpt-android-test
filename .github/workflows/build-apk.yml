@@ -1,7 +1,10 @@
-
 name: Build SCPT test APK
-on:
+
+'on':
   workflow_dispatch:
+  push:
+    branches:
+      - main
 
 jobs:
   android:
